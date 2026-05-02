@@ -1,18 +1,18 @@
-const socials = [
-  { name: "Instagram", href: "#" },
-  { name: "TikTok", href: "#" },
-  { name: "X / Twitter", href: "#" },
-  { name: "YouTube", href: "#" },
-];
-
-const streaming = [
-  { name: "Audiomack", href: "#" },
-  { name: "Spotify", href: "#" },
-  { name: "Apple Music", href: "#" },
-  { name: "Boomplay", href: "#" },
-];
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export function Footer() {
+  const s = useSiteSettings();
+  const socials = [
+    { name: "Instagram", href: s.instagram_url },
+    { name: "X / Twitter", href: s.twitter_url },
+    { name: "YouTube", href: s.youtube_channel_url },
+  ];
+  const streaming = [
+    { name: "Audiomack", href: s.audiomack_url },
+    { name: "Spotify", href: s.spotify_url },
+    { name: "Apple Music", href: "#" },
+  ];
+
   return (
     <footer className="relative border-t border-border bg-ink/50 pt-16 pb-8">
       <div className="max-w-7xl mx-auto px-5 md:px-10">
@@ -50,7 +50,9 @@ function FooterCol({ title, items }: { title: string; items: { name: string; hre
         {items.map((it) => (
           <li key={it.name}>
             <a
-              href={it.href}
+              href={it.href || "#"}
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-sm text-muted-foreground hover:text-gold transition-colors inline-flex items-center gap-2 group"
             >
               {it.name}

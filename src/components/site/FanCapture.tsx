@@ -1,14 +1,24 @@
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export function FanCapture() {
+  const s = useSiteSettings();
   const [submitted, setSubmitted] = useState(false);
   const [email, setEmail] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const onSubmit = (e: React.FormEvent) => {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email && !whatsapp) return;
+    setBusy(true);
+    await supabase.from("fan_emails").insert({ email, whatsapp_number: whatsapp });
+    if (s.whatsapp_invite_url && s.whatsapp_invite_url !== "#") {
+      window.open(s.whatsapp_invite_url, "_blank", "noopener,noreferrer");
+    }
     setSubmitted(true);
+    setBusy(false);
   };
 
   return (
@@ -43,24 +53,13 @@ export function FanCapture() {
         ) : (
           <form onSubmit={onSubmit} className="max-w-2xl mx-auto space-y-3">
             <div className="grid sm:grid-cols-2 gap-3">
-              <Field
-                icon={<MailIcon />}
-                placeholder="your@email.com"
-                type="email"
-                value={email}
-                onChange={setEmail}
-              />
-              <Field
-                icon={<WhatsAppIcon />}
-                placeholder="+234 WhatsApp"
-                type="tel"
-                value={whatsapp}
-                onChange={setWhatsapp}
-              />
+              <Field icon={<MailIcon />} placeholder="your@email.com" type="email" value={email} onChange={setEmail} />
+              <Field icon={<WhatsAppIcon />} placeholder="+234 WhatsApp" type="tel" value={whatsapp} onChange={setWhatsapp} />
             </div>
             <button
               type="submit"
-              className="w-full px-6 py-4 rounded-xl bg-gradient-gold text-ink font-bold text-base shadow-gold hover:shadow-gold transition-all hover:-translate-y-0.5"
+              disabled={busy}
+              className="w-full px-6 py-4 rounded-xl bg-gradient-gold text-ink font-bold text-base shadow-gold hover:shadow-gold transition-all hover:-translate-y-0.5 disabled:opacity-60"
             >
               Join the Movement →
             </button>

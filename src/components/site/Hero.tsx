@@ -1,34 +1,32 @@
 import heroImg from "@/assets/usman-hero.jpg";
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export function Hero() {
+  const s = useSiteSettings();
+  const img = s.hero_image_url || heroImg;
   return (
     <section
       id="top"
       className="relative min-h-[100svh] w-full overflow-hidden grain"
     >
-      {/* Background image */}
       <div className="absolute inset-0">
         <img
-          src={heroImg}
+          src={img}
           alt="Usman Bee — Nigerian hip-hop artist portrait"
           className="w-full h-full object-cover object-[center_20%] md:object-center scale-105 reveal-fade"
           fetchPriority="high"
         />
-        {/* layered gradients */}
         <div className="absolute inset-0 bg-gradient-to-b from-background/50 via-background/20 to-background" />
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/30 to-transparent md:from-background/90 md:via-background/40" />
       </div>
 
-      {/* Floating gold orb */}
       <div className="absolute -right-40 -top-40 w-[600px] h-[600px] bg-radial-gold blur-3xl pointer-events-none float-slow" />
 
-      {/* Vertical side label */}
       <div className="hidden lg:flex absolute left-8 top-1/2 -translate-y-1/2 -rotate-90 origin-left items-center gap-3 text-xs font-mono uppercase tracking-[0.4em] text-muted-foreground z-10">
         <span className="block w-12 h-px bg-gold" />
         Lagos × Northern Nigeria
       </div>
 
-      {/* Content */}
       <div className="relative z-10 max-w-7xl mx-auto px-5 md:px-10 min-h-[100svh] flex flex-col justify-end pb-20 md:pb-28 pt-32">
         <div className="max-w-3xl">
           <div className="reveal-up flex items-center gap-3 mb-6">
@@ -48,8 +46,7 @@ export function Hero() {
           </h1>
 
           <p className="reveal-up delay-200 mt-8 max-w-xl text-lg md:text-xl text-muted-foreground leading-relaxed">
-            From the dust of the North to the lights of Lagos — and now,
-            <span className="text-foreground"> to the world.</span> A new sound is rising.
+            {s.hero_tagline}
           </p>
 
           <div className="reveal-up delay-300 mt-10 flex flex-wrap items-center gap-4">
@@ -70,16 +67,14 @@ export function Hero() {
             </a>
           </div>
 
-          {/* Stats strip */}
           <div className="reveal-up delay-500 mt-16 grid grid-cols-3 gap-6 md:gap-12 max-w-lg border-t border-border pt-8">
-            <Stat value="2.4M+" label="Streams" />
-            <Stat value="50K+" label="Followers" />
-            <Stat value="12" label="Releases" />
+            <Stat value={s.hero_stat1_value} label={s.hero_stat1_label} />
+            <Stat value={s.hero_stat2_value} label={s.hero_stat2_label} />
+            <Stat value={s.hero_stat3_value} label={s.hero_stat3_label} />
           </div>
         </div>
       </div>
 
-      {/* Scroll hint */}
       <div className="absolute bottom-6 right-6 md:right-10 z-10 hidden md:flex flex-col items-center gap-2 text-xs font-mono uppercase tracking-[0.3em] text-muted-foreground">
         <span>Scroll</span>
         <span className="block w-px h-12 bg-gradient-to-b from-gold to-transparent" />
@@ -91,9 +86,7 @@ export function Hero() {
 function Stat({ value, label }: { value: string; label: string }) {
   return (
     <div>
-      <div className="font-display text-2xl md:text-4xl font-bold text-gradient-gold">
-        {value}
-      </div>
+      <div className="font-display text-2xl md:text-4xl font-bold text-gradient-gold">{value}</div>
       <div className="mt-1 text-[10px] md:text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground">
         {label}
       </div>

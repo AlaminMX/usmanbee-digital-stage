@@ -1,7 +1,27 @@
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export function Booking() {
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [form, setForm] = useState({ name: "", email: "", subject: "", message: "" });
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    const { error: err } = await supabase.from("bookings").insert(form);
+    setBusy(false);
+    if (err) {
+      setError("Something went wrong. Please try again.");
+      return;
+    }
+    setSent(true);
+  };
+
+  const upd = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setForm({ ...form, [k]: e.target.value });
 
   return (
     <section id="contact" className="relative py-24 md:py-36">
@@ -31,33 +51,30 @@ export function Booking() {
                 <div>
                   <div className="text-4xl mb-3">✓</div>
                   <div className="font-display text-2xl font-bold mb-2">Message received.</div>
-                  <p className="text-muted-foreground">
-                    Team will respond within 48 hours.
-                  </p>
+                  <p className="text-muted-foreground">Team will respond within 48 hours.</p>
                 </div>
               </div>
             ) : (
-              <form
-                onSubmit={(e) => { e.preventDefault(); setSent(true); }}
-                className="space-y-4 p-6 md:p-8 rounded-2xl border border-border bg-card/50 backdrop-blur"
-              >
-                <Input label="Name" placeholder="Your name" />
-                <Input label="Email" type="email" placeholder="you@brand.com" />
-                <Input label="Subject" placeholder="Show booking · Feature · Brand deal" />
+              <form onSubmit={submit} className="space-y-4 p-6 md:p-8 rounded-2xl border border-border bg-card/50 backdrop-blur">
+                <Input label="Name" placeholder="Your name" value={form.name} onChange={upd("name")} />
+                <Input label="Email" type="email" placeholder="you@brand.com" value={form.email} onChange={upd("email")} />
+                <Input label="Subject" placeholder="Show booking · Feature · Brand deal" value={form.subject} onChange={upd("subject")} />
                 <div>
-                  <label className="block text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground mb-2">
-                    Message
-                  </label>
+                  <label className="block text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground mb-2">Message</label>
                   <textarea
                     required
                     rows={5}
+                    value={form.message}
+                    onChange={upd("message")}
                     placeholder="Tell us about the opportunity..."
                     className="w-full px-4 py-3 rounded-xl bg-background border border-border focus:border-gold focus:outline-none transition-colors resize-none"
                   />
                 </div>
+                {error && <div className="text-sm text-red-400">{error}</div>}
                 <button
                   type="submit"
-                  className="w-full px-6 py-4 rounded-xl bg-gradient-gold text-ink font-bold shadow-gold hover:-translate-y-0.5 transition-all"
+                  disabled={busy}
+                  className="w-full px-6 py-4 rounded-xl bg-gradient-gold text-ink font-bold shadow-gold hover:-translate-y-0.5 transition-all disabled:opacity-60"
                 >
                   Send Message →
                 </button>
@@ -70,15 +87,20 @@ export function Booking() {
   );
 }
 
-function Input({ label, type = "text", placeholder }: { label: string; type?: string; placeholder: string }) {
+function Input({
+  label, type = "text", placeholder, value, onChange,
+}: {
+  label: string; type?: string; placeholder: string;
+  value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}) {
   return (
     <div>
-      <label className="block text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground mb-2">
-        {label}
-      </label>
+      <label className="block text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground mb-2">{label}</label>
       <input
         required
         type={type}
+        value={value}
+        onChange={onChange}
         placeholder={placeholder}
         className="w-full px-4 py-3 rounded-xl bg-background border border-border focus:border-gold focus:outline-none transition-colors"
       />
@@ -90,9 +112,7 @@ function ContactRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between p-4 rounded-xl border border-border hover:border-gold transition-colors group">
       <div>
-        <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground mb-1">
-          {label}
-        </div>
+        <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground mb-1">{label}</div>
         <div className="font-medium group-hover:text-gold transition-colors">{value}</div>
       </div>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-muted-foreground group-hover:text-gold transition-colors">
