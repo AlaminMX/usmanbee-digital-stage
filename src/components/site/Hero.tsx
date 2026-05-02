@@ -1,21 +1,23 @@
-import heroImg from "@/assets/usman-hero.jpg";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export function Hero() {
   const s = useSiteSettings();
-  const img = s.hero_image_url || heroImg;
+  const img = s.hero_image_url || null;
+
   return (
     <section
       id="top"
       className="relative min-h-[100svh] w-full overflow-hidden grain"
     >
       <div className="absolute inset-0">
-        <img
-          src={img}
-          alt="Usman Bee — Nigerian hip-hop artist portrait"
-          className="w-full h-full object-cover object-[center_20%] md:object-center scale-105 reveal-fade"
-          fetchPriority="high"
-        />
+        {img && (
+          <img
+            src={img}
+            alt="Usman Bee — Nigerian hip-hop artist portrait"
+            className="w-full h-full object-cover object-[center_20%] md:object-center scale-105 reveal-fade"
+            fetchPriority="high"
+          />
+        )}
         <div className="absolute inset-0 bg-gradient-to-b from-background/50 via-background/20 to-background" />
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/30 to-transparent md:from-background/90 md:via-background/40" />
       </div>
@@ -45,9 +47,11 @@ export function Hero() {
             <span className="text-gradient-gold italic font-bold">Bee.</span>
           </h1>
 
-          <p className="reveal-up delay-200 mt-8 max-w-xl text-lg md:text-xl text-muted-foreground leading-relaxed">
-            {s.hero_tagline}
-          </p>
+          {s.hero_tagline && (
+            <p className="reveal-up delay-200 mt-8 max-w-xl text-lg md:text-xl text-muted-foreground leading-relaxed">
+              {s.hero_tagline}
+            </p>
+          )}
 
           <div className="reveal-up delay-300 mt-10 flex flex-wrap items-center gap-4">
             <a
@@ -84,6 +88,7 @@ export function Hero() {
 }
 
 function Stat({ value, label }: { value: string; label: string }) {
+  if (!value && !label) return null;
   return (
     <div>
       <div className="font-display text-2xl md:text-4xl font-bold text-gradient-gold">{value}</div>
@@ -108,4 +113,5 @@ function ArrowIcon() {
       <path d="M5 12h14M13 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
-}
+      }
+              
