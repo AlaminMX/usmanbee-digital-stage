@@ -14,13 +14,171 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      admin_users: {
+        Row: {
+          created_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      bookings: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          message: string
+          name: string
+          status: string
+          subject: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          message: string
+          name: string
+          status?: string
+          subject?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          message?: string
+          name?: string
+          status?: string
+          subject?: string | null
+        }
+        Relationships: []
+      }
+      fan_emails: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          whatsapp_number: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          whatsapp_number?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          whatsapp_number?: string | null
+        }
+        Relationships: []
+      }
+      site_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: string | null
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value?: string | null
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: string | null
+        }
+        Relationships: []
+      }
+      tracks: {
+        Row: {
+          audiomack_embed_url: string | null
+          cover_image_url: string | null
+          created_at: string
+          display_order: number
+          duration: string | null
+          id: string
+          is_active: boolean
+          plays: string | null
+          spotify_embed_url: string | null
+          subtitle: string | null
+          title: string
+        }
+        Insert: {
+          audiomack_embed_url?: string | null
+          cover_image_url?: string | null
+          created_at?: string
+          display_order?: number
+          duration?: string | null
+          id?: string
+          is_active?: boolean
+          plays?: string | null
+          spotify_embed_url?: string | null
+          subtitle?: string | null
+          title: string
+        }
+        Update: {
+          audiomack_embed_url?: string | null
+          cover_image_url?: string | null
+          created_at?: string
+          display_order?: number
+          duration?: string | null
+          id?: string
+          is_active?: boolean
+          plays?: string | null
+          spotify_embed_url?: string | null
+          subtitle?: string | null
+          title?: string
+        }
+        Relationships: []
+      }
+      videos: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          is_active: boolean
+          tag: string | null
+          thumbnail_url: string | null
+          title: string
+          youtube_video_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          tag?: string | null
+          thumbnail_url?: string | null
+          title: string
+          youtube_video_id: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          tag?: string | null
+          thumbnail_url?: string | null
+          title?: string
+          youtube_video_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_admin: { Args: { _uid: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
