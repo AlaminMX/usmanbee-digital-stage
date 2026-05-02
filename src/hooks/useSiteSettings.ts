@@ -16,12 +16,13 @@ const DEFAULTS: SiteSettings = {
   countdown_active: "true",
   countdown_target_date: "",
   countdown_release_title: "New Single",
-  whatsapp_invite_url: "#",
-  instagram_url: "#",
-  audiomack_url: "#",
-  spotify_url: "#",
-  youtube_channel_url: "#",
-  twitter_url: "#",
+  whatsapp_invite_url: "",
+  instagram_url: "",
+  audiomack_url: "",
+  spotify_url: "",
+  apple_music_url: "",
+  youtube_channel_url: "",
+  twitter_url: "",
   artist_bio: "",
 };
 
@@ -52,4 +53,5 @@ export function useSiteSettings() {
 
 export function refreshSiteSettings() {
   return load();
-}
+    }
+               
