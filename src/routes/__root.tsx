@@ -29,14 +29,18 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
+      { title: "Usman Bee" },
+      { name: "description", content: "A Nigerian singer, songwriter, and musician known for Afrobeats." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { property: "og:title", content: "Usman Bee" },
+      { property: "og:description", content: "A Nigerian singer, songwriter, and musician known for Afrobeats." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:title", content: "Usman Bee" },
+      { name: "twitter:description", content: "A Nigerian singer, songwriter, and musician known for Afrobeats." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/0218eea4-e790-41bc-a8df-10903a09de7a/id-preview-33adb8cb--88d04f85-a94e-4976-a74b-717666cd5d6c.lovable.app-1777721355833.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/0218eea4-e790-41bc-a8df-10903a09de7a/id-preview-33adb8cb--88d04f85-a94e-4976-a74b-717666cd5d6c.lovable.app-1777721355833.png" },
     ],
     links: [
       {
