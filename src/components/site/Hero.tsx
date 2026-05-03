@@ -1,21 +1,29 @@
+import { useEffect, useState } from "react";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export function Hero() {
   const s = useSiteSettings();
   const img = s.hero_image_url || null;
+  const [imgReady, setImgReady] = useState(false);
+
+  useEffect(() => {
+    if (!img) return;
+    setImgReady(false);
+    const el = new Image();
+    el.src = img;
+    el.onload = () => setImgReady(true);
+  }, [img]);
 
   return (
-    <section
-      id="top"
-      className="relative min-h-[100svh] w-full overflow-hidden grain"
-    >
+    <section id="top" className="relative min-h-[100svh] w-full overflow-hidden grain">
       <div className="absolute inset-0">
-        {img && (
+        {img && imgReady && (
           <img
             src={img}
             alt="Usman Bee — Nigerian hip-hop artist portrait"
-            className="w-full h-full object-cover object-[center_20%] md:object-center scale-105 reveal-fade"
+            className="w-full h-full object-cover object-[center_20%] md:object-center scale-105"
             fetchPriority="high"
+            decoding="async"
           />
         )}
         <div className="absolute inset-0 bg-gradient-to-b from-background/50 via-background/20 to-background" />
