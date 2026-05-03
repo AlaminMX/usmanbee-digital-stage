@@ -165,7 +165,7 @@ export function Music() {
                    * NOT including allow-top-navigation means the iframe can NEVER
                    * redirect the parent page — the root cause of the original bug.
                    */
-                  sandbox="allow-scripts allow-same-origin allow-popups"
+                  sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation allow-pointer-lock"
                   loading="lazy"
                   title={current?.title}
                   className="rounded-xl border-0"
