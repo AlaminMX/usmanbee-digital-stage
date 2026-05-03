@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 
@@ -13,23 +13,13 @@ type Track = {
   cover_image_url: string | null;
 };
 
-/**
- * Converts any Spotify URL format to a valid embed src.
- * Handles:
- *   https://open.spotify.com/track/ID          → embed URL
- *   https://open.spotify.com/embed/track/ID    → unchanged
- *   https://open.spotify.com/embed/track/ID?...→ stripped + rebuilt
- */
 function toSpotifyEmbedSrc(url: string | null): string | null {
   if (!url) return null;
   try {
     const u = new URL(url);
-    // Already an embed URL — just ensure clean params
     if (u.pathname.startsWith("/embed/")) {
       return `https://open.spotify.com${u.pathname}?utm_source=generator&theme=0`;
     }
-    // Regular share URL — convert to embed
-    // pathname looks like /track/4iV5W9uYEdYUVa79Axb7Rh
     const embedPath = u.pathname.replace(/^\//, "embed/");
     return `https://open.spotify.com/${embedPath}?utm_source=generator&theme=0`;
   } catch {
@@ -42,7 +32,6 @@ export function Music() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const prevActiveId = useRef<string | null>(null);
 
   useEffect(() => {
     supabase
@@ -64,9 +53,8 @@ export function Music() {
 
   const handleTrackClick = (id: string) => {
     if (id === activeId) return;
-    prevActiveId.current = activeId;
     setActiveId(id);
-    // Keep playing if already playing, stay paused if paused
+    // keep isPlaying state — if playing, new track loads into embed
   };
 
   const handlePlayPause = () => {
@@ -120,17 +108,19 @@ export function Music() {
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-ink/90 via-transparent to-transparent" />
 
-              {/* Play / Pause button */}
-              <button
-                onClick={handlePlayPause}
-                className="absolute inset-0 grid place-items-center group/play"
-                aria-label={isPlaying ? "Pause" : "Play"}
-                disabled={!embedSrc}
-              >
-                <span className="w-20 h-20 rounded-full bg-gradient-gold grid place-items-center shadow-gold transform group-hover/play:scale-110 transition-transform">
-                  {isPlaying ? <PauseIcon /> : <PlayIcon />}
-                </span>
-              </button>
+              {/* Play / Pause overlay button — only shown when embed is hidden */}
+              {!isPlaying && (
+                <button
+                  onClick={handlePlayPause}
+                  className="absolute inset-0 grid place-items-center group/play"
+                  aria-label="Play"
+                  disabled={!embedSrc}
+                >
+                  <span className="w-20 h-20 rounded-full bg-gradient-gold grid place-items-center shadow-gold transform group-hover/play:scale-110 transition-transform">
+                    <PlayIcon />
+                  </span>
+                </button>
+              )}
 
               {/* Track info overlay */}
               <div className="absolute bottom-0 left-0 right-0 p-6 pointer-events-none">
@@ -142,12 +132,13 @@ export function Music() {
               </div>
             </div>
 
-            {/* Spotify embed — slides in below artwork when playing */}
+            {/* Spotify embed — slides in below artwork, fully interactive */}
             <div
               className="overflow-hidden transition-all duration-500 rounded-xl mt-3"
               style={{
                 height: isPlaying && embedSrc ? "152px" : "0px",
                 opacity: isPlaying && embedSrc ? 1 : 0,
+                pointerEvents: isPlaying && embedSrc ? "auto" : "none",
               }}
             >
               {embedSrc && (
@@ -157,21 +148,25 @@ export function Music() {
                   width="100%"
                   height="152"
                   allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                  /**
-                   * sandbox is the critical fix:
-                   * - allow-scripts: lets Spotify's player JS run
-                   * - allow-same-origin: lets it load its resources
-                   * - allow-popups: lets "Open in Spotify" open a NEW TAB (not redirect THIS page)
-                   * NOT including allow-top-navigation means the iframe can NEVER
-                   * redirect the parent page — the root cause of the original bug.
-                   */
                   sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation allow-pointer-lock"
                   loading="lazy"
-                  title={current?.title}
-                  className="rounded-xl border-0"
+                  title={current?.title ?? "Track"}
+                  className="rounded-xl border-0 w-full"
+                  style={{ display: "block" }}
                 />
               )}
             </div>
+
+            {/* Pause button — shown below embed when playing */}
+            {isPlaying && (
+              <button
+                onClick={handlePlayPause}
+                className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border hover:border-gold text-sm text-muted-foreground hover:text-gold transition-colors"
+              >
+                <PauseIcon small />
+                Stop / Change Track
+              </button>
+            )}
 
             {/* Audiomack link */}
             {s.audiomack_url && s.audiomack_url !== "#" && (
@@ -298,9 +293,10 @@ function PlayIcon() {
   );
 }
 
-function PauseIcon() {
+function PauseIcon({ small }: { small?: boolean }) {
+  const size = small ? 16 : 28;
   return (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" className="text-ink">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" className={small ? "text-current" : "text-ink"}>
       <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
     </svg>
   );
