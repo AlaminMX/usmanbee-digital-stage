@@ -292,5 +292,4 @@ function MusicNoteIcon({ small }: { small?: boolean }) {
       <circle cx="18" cy="16" r="3" />
     </svg>
   );
-    }
-      
+}
