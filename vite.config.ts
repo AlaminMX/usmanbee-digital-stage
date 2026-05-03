@@ -1,9 +1,25 @@
-// @lovable.dev/vite-tanstack-config already includes the following — do NOT add them manually
-// or the app will break with duplicate plugins:
-//   - tanstackStart, viteReact, tailwindcss, tsConfigPaths, cloudflare (build-only),
-//     componentTagger (dev-only), VITE_* env injection, @ path alias, React/TanStack dedupe,
-//     error logger plugins, and sandbox detection (port/host/strictPort).
-// You can pass additional config via defineConfig({ vite: { ... } }) if needed.
-import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import { defineConfig } from "vite";
+import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import { nitro } from "nitro/vite";
+import viteReact from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import tsConfigPaths from "vite-tsconfig-paths";
 
-export default defineConfig();
+// On Vercel: VERCEL env var is automatically set to "1" at build time.
+// Nitro's vercel preset emits .vercel/output (Build Output API v3) which
+// Vercel picks up automatically — no routing config needed in vercel.json.
+const isVercel = !!process.env.VERCEL;
+
+export default defineConfig({
+  plugins: [
+    tsConfigPaths(),
+    tailwindcss(),
+    tanstackStart(),
+    nitro(
+      isVercel
+        ? { preset: "vercel" }
+        : { preset: "node-server", output: { dir: "dist" } },
+    ),
+    viteReact(),
+  ],
+});
