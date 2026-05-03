@@ -1,80 +1,97 @@
-# Usman Bee — Backend + Admin Dashboard
+## Goal
 
-Adds a real backend (Lovable Cloud / Supabase) and a password-gated `/admin` dashboard. The public site's CSS, layout, fonts, animations, and component file names stay exactly as-is — only data sources, embeds, and form handlers change.
+Reconfigure the TanStack Start build to target Vercel's Node.js serverless runtime instead of Cloudflare Workers, and route all incoming requests through a single Vercel Serverless Function.
 
----
+## Important caveat (please read first)
 
-## 1. Enable Lovable Cloud
+This project is currently built with `@lovable.dev/vite-tanstack-config`, which is the wrapper that wires up the Cloudflare preset, Lovable's preview sandbox, and the in-editor Publish flow on `*.lovable.app`.
 
-Lovable Cloud is not yet enabled (no `src/integrations/supabase`). Enabling it provisions Supabase, generates the typed client at `src/integrations/supabase/client.ts`, and exposes env vars automatically.
+Moving to a Vercel Node build means:
+- The Lovable in-editor **Preview** and **Publish** buttons (which deploy to `usmanbee-digital-stage.lovable.app`) will likely stop working correctly — those rely on the Cloudflare/Workers output. The "Publish or update your Lovable project for it to appear here" banner you're seeing is the Lovable preview pipeline; switching presets won't fix it and may make it worse.
+- Deploys will move to **Vercel** (you'll need a Vercel project + `vercel deploy` or Git integration). Lovable Cloud (database, auth, storage, edge env vars) keeps working — only the hosting target changes.
 
-## 2. Database (migration)
+If your real goal is just to fix the broken Lovable preview banner, the right fix is usually to click **Publish → Update** in the Lovable editor, not to switch hosts. Let me know if you'd rather I investigate that instead.
 
-Tables (all with RLS enabled):
+Assuming you do want the Vercel Node migration, here's the plan:
 
-- **tracks** — `id, title, subtitle, duration, plays, spotify_embed_url, audiomack_embed_url, cover_image_url, display_order int, is_active bool, created_at`
-- **videos** — `id, title, tag, youtube_video_id, thumbnail_url, display_order int, is_active bool, created_at`
-- **bookings** — `id, name, email, subject, message, status text default 'unread', created_at`
-- **site_settings** — `key text unique, value text, updated_at`
-- **fan_emails** — `id, email, whatsapp_number, created_at`
-- **admin_users** — `user_id uuid` (references the one Supabase auth user used for admin writes)
+## Changes
 
-RLS policies:
+### 1. Replace the Lovable Vite wrapper with a direct TanStack Start config
 
-- `tracks`, `videos`, `site_settings` → public SELECT where `is_active` (or always for settings).
-- `bookings`, `fan_emails` → public INSERT only.
-- All write operations (UPDATE/DELETE/INSERT on tracks/videos/site_settings, SELECT/UPDATE/DELETE on bookings & fan_emails) gated by an `is_admin(auth.uid())` SECURITY DEFINER function checking `admin_users`.
+`vite.config.ts` — stop using `@lovable.dev/vite-tanstack-config` (Cloudflare-targeted) and configure plugins manually with the Node target:
 
-Storage buckets (public read): `track-covers`, `site-images`.
+```ts
+import { defineConfig } from "vite";
+import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import viteReact from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
+import tsConfigPaths from "vite-tsconfig-paths";
 
-Seed `site_settings` with current defaults (hero stats, tagline, bio, countdown date, social URLs as `#`, `whatsapp_invite_url`).
+export default defineConfig({
+  plugins: [
+    tsConfigPaths(),
+    tailwindcss(),
+    tanstackStart({ target: "node-server" }),
+    viteReact(),
+  ],
+});
+```
 
-## 3. Admin authentication
+### 2. Remove Cloudflare-specific config
 
-Per spec, `/admin` uses a hardcoded credential gate (username `Usmanadmin`, password `U$M@N@DM!N`) stored in `sessionStorage.adminAuthenticated`. Because Supabase RLS needs a real auth user to allow writes, the gate also performs a silent `signInWithPassword` against a single pre-provisioned Supabase auth user (`admin@usmanbee.local`) whose `user_id` is inserted into `admin_users`. The login form only ever shows the hardcoded fields; the Supabase login is invisible.
+- Delete `wrangler.jsonc`.
+- Remove `@cloudflare/vite-plugin` from `package.json` dependencies.
+- Remove `@lovable.dev/vite-tanstack-config` from devDependencies (or keep it unused — but cleanest to remove).
 
-- Login card centered, dark/gold theme, inline "Invalid credentials." error.
-- Logout clears sessionStorage + `supabase.auth.signOut()`.
-- No signup, no recovery.
+### 3. Replace `vercel.json` with a Node-function rewrite
 
-## 4. Admin dashboard — `/admin`
+The current `vercel.json` rewrites everything to `/index.html` (SPA mode, no SSR). Replace with a single serverless function entry that hands every request to the TanStack Start Node server:
 
-New route `src/routes/admin.tsx` (and a small `src/components/admin/` folder). Sidebar layout with four tabs:
+```json
+{
+  "version": 2,
+  "functions": {
+    "api/server.mjs": { "runtime": "nodejs20.x" }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/server" }
+  ]
+}
+```
 
-1. **Music** — list of tracks (cover, title, subtitle, duration, plays, active toggle, drag-handle reorder updating `display_order`, Edit, Delete). Add/Edit form with all fields incl. Spotify/Audiomack embed URLs and cover upload to `track-covers`. Public site shows top 4 active.
-2. **Videos** — list (YT thumbnail, title, tag, toggle, reorder, edit, delete). Add form: title, tag, YouTube ID, display_order; thumbnail auto-derived `https://img.youtube.com/vi/{id}/maxresdefault.jpg`.
-3. **Bookings** — newest first, expandable message, status badge (unread=gold, read=grey, archived=dim). Actions: Mark Read / Archive / Delete. Sidebar shows unread count badge.
-4. **Site Settings** — sectioned form (Hero, Countdown, Fan Capture, Socials, Story). Each section has its own Save → upserts into `site_settings`. Hero image uploads to `site-images`. Countdown section includes the show/hide toggle, target datetime picker, release title.
+### 4. Add the Vercel Node function entry
 
-Styling reuses existing dark + gold tokens from `src/styles.css` — no new design system.
+`api/server.mjs` — thin adapter that imports the built TanStack Start Node server entry and exports a Vercel-compatible handler:
 
-## 5. Public site wiring (no visual changes)
+```js
+import handler from "../.output/server/index.mjs";
+export default handler;
+```
 
-A shared `src/hooks/useSiteSettings.ts` fetches `site_settings` once and exposes a typed object.
+(Exact import path depends on what `target: "node-server"` emits; will verify after first build and adjust to whatever output directory TanStack Start produces — likely `.output/server/index.mjs` or `dist/server/index.mjs`.)
 
-- **Hero.tsx** — replace hardcoded image/stats/tagline with values from settings (fallback to current defaults so first paint is identical).
-- **Countdown.tsx** — if `countdown_active !== 'true'` return null; else read `countdown_target_date` and display "Dropping: {countdown_release_title}" above timer; show "Out Now — Stream It." at zero.
-- **Music.tsx** — fetch active tracks (limit 4, ordered). On track select, swap the artwork area for a Spotify iframe using `spotify_embed_url`; small "Also on Audiomack" link below opens `audiomack_embed_url` in new tab. Streaming platform buttons read URLs from `site_settings`.
-- **Videos.tsx** — fetch active videos. Click opens a YouTube lightbox modal (built with the existing `Dialog` UI) with autoplay iframe and close button. "Full channel" link uses `youtube_channel_url`.
-- **Story.tsx** — read `artist_bio`.
-- **Booking.tsx** — submit INSERTs into `bookings`; success → existing success state; error → "Something went wrong. Please try again."
-- **FanCapture.tsx** — INSERT email + whatsapp into `fan_emails`, then `window.open(whatsapp_invite_url, '_blank')`, then show existing success state.
-- **Footer.tsx / Nav.tsx** — social icons read from `site_settings`.
+### 5. Environment variables on Vercel
 
-No CSS, Tailwind class, animation, font, or layout edits anywhere on the public site.
+Document that the user must set these in Vercel project settings (they're currently injected by Lovable Cloud locally):
+- `SUPABASE_URL`
+- `SUPABASE_PUBLISHABLE_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+- `VITE_SUPABASE_PROJECT_ID`
 
-## Technical notes
+### 6. Verify
 
-- Supabase typed client used everywhere; no service role key in the browser — admin writes rely on the signed-in admin auth user + RLS.
-- New route file `src/routes/admin.tsx` (flat TanStack Start convention).
-- New files: `src/integrations/supabase/*` (auto), `src/hooks/useSiteSettings.ts`, `src/lib/admin-auth.ts`, `src/components/admin/{Sidebar,MusicTab,VideosTab,BookingsTab,SettingsTab,LoginGate}.tsx`, `src/components/site/VideoLightbox.tsx`.
-- One SQL migration creates tables, policies, `is_admin()` function, buckets + bucket policies, and seeds `site_settings`.
-- The single admin auth user (`admin@usmanbee.local`) and its `admin_users` row are created in the same migration via Supabase admin API call so the hardcoded credentials gate can sign in immediately.
+- Run `bun install` and `bun run build`, confirm the build emits a Node server bundle (not a Worker).
+- Inspect the output path and update `api/server.mjs` import if needed.
+- After you deploy to Vercel, test `/`, `/admin`, and `/api/public/admin-bootstrap` to confirm SSR + server routes both work through the single function.
 
-## Out of scope
+## What I will NOT touch
 
-- No redesign of the public site.
-- No additional admin users, password reset, or 2FA.
-- No analytics dashboards beyond unread booking count.
+- Application code (`src/**`), database schema, Supabase clients — none of that changes.
+- Lovable Cloud connection — your DB/auth/storage stay the same.
 
-ASK QUESTIONS IF NEEDED 
+## Confirm before I proceed
+
+1. You're okay losing the Lovable in-editor Publish/Preview to `lovable.app` and moving hosting fully to Vercel?
+2. Or do you actually just want me to debug the "Publish or update…" preview banner on Lovable hosting (no host switch)?
