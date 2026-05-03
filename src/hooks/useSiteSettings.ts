@@ -53,5 +53,4 @@ export function useSiteSettings() {
 
 export function refreshSiteSettings() {
   return load();
-    }
-               
+}
