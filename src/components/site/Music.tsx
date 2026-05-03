@@ -13,6 +13,30 @@ type Track = {
   cover_image_url: string | null;
 };
 
+/**
+ * Converts any Spotify URL format to a valid embed src.
+ * Handles:
+ *   https://open.spotify.com/track/ID          → embed URL
+ *   https://open.spotify.com/embed/track/ID    → unchanged
+ *   https://open.spotify.com/embed/track/ID?...→ stripped + rebuilt
+ */
+function toSpotifyEmbedSrc(url: string | null): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    // Already an embed URL — just ensure clean params
+    if (u.pathname.startsWith("/embed/")) {
+      return `https://open.spotify.com${u.pathname}?utm_source=generator&theme=0`;
+    }
+    // Regular share URL — convert to embed
+    // pathname looks like /track/4iV5W9uYEdYUVa79Axb7Rh
+    const embedPath = u.pathname.replace(/^\//, "embed/");
+    return `https://open.spotify.com/${embedPath}?utm_source=generator&theme=0`;
+  } catch {
+    return null;
+  }
+}
+
 export function Music() {
   const s = useSiteSettings();
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -36,25 +60,24 @@ export function Music() {
   }, []);
 
   const current = tracks.find((t) => t.id === activeId) ?? null;
+  const embedSrc = toSpotifyEmbedSrc(current?.spotify_embed_url ?? null);
 
-  // When switching tracks while already playing, keep playing (embed src updates)
   const handleTrackClick = (id: string) => {
     if (id === activeId) return;
     prevActiveId.current = activeId;
     setActiveId(id);
-    // If already playing, keep playing the new track
-    // If paused, just update display — don't auto-play
+    // Keep playing if already playing, stay paused if paused
   };
 
   const handlePlayPause = () => {
-    if (!current?.spotify_embed_url) return;
+    if (!embedSrc) return;
     setIsPlaying((v) => !v);
   };
 
   const platforms = [
     { name: "Audiomack", color: "from-orange-500 to-amber-500", primary: true, href: s.audiomack_url },
     { name: "Spotify", color: "from-green-500 to-emerald-600", href: s.spotify_url },
-    { name: "Apple Music", color: "from-pink-500 to-red-500", href: s.apple_music_url || null },
+    { name: "Apple Music", color: "from-pink-500 to-red-500", href: (s as any).apple_music_url || null },
     { name: "YouTube Music", color: "from-red-500 to-red-700", href: s.youtube_channel_url },
   ].filter((p) => p.href && p.href !== "#");
 
@@ -102,14 +125,10 @@ export function Music() {
                 onClick={handlePlayPause}
                 className="absolute inset-0 grid place-items-center group/play"
                 aria-label={isPlaying ? "Pause" : "Play"}
-                disabled={!current?.spotify_embed_url}
+                disabled={!embedSrc}
               >
                 <span className="w-20 h-20 rounded-full bg-gradient-gold grid place-items-center shadow-gold transform group-hover/play:scale-110 transition-transform">
-                  {isPlaying ? (
-                    <PauseIcon />
-                  ) : (
-                    <PlayIcon />
-                  )}
+                  {isPlaying ? <PauseIcon /> : <PlayIcon />}
                 </span>
               </button>
 
@@ -123,27 +142,39 @@ export function Music() {
               </div>
             </div>
 
-            {/* Spotify embed — rendered below artwork, shown only when playing */}
+            {/* Spotify embed — slides in below artwork when playing */}
             <div
               className="overflow-hidden transition-all duration-500 rounded-xl mt-3"
-              style={{ height: isPlaying && current?.spotify_embed_url ? "152px" : "0px", opacity: isPlaying && current?.spotify_embed_url ? 1 : 0 }}
+              style={{
+                height: isPlaying && embedSrc ? "152px" : "0px",
+                opacity: isPlaying && embedSrc ? 1 : 0,
+              }}
             >
-              {current?.spotify_embed_url && (
+              {embedSrc && (
                 <iframe
-                  key={current.id}
-                  src={`${current.spotify_embed_url}?utm_source=generator&theme=0`}
+                  key={current?.id}
+                  src={embedSrc}
                   width="100%"
                   height="152"
                   allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                  /**
+                   * sandbox is the critical fix:
+                   * - allow-scripts: lets Spotify's player JS run
+                   * - allow-same-origin: lets it load its resources
+                   * - allow-popups: lets "Open in Spotify" open a NEW TAB (not redirect THIS page)
+                   * NOT including allow-top-navigation means the iframe can NEVER
+                   * redirect the parent page — the root cause of the original bug.
+                   */
+                  sandbox="allow-scripts allow-same-origin allow-popups"
                   loading="lazy"
-                  title={current.title}
+                  title={current?.title}
                   className="rounded-xl border-0"
                 />
               )}
             </div>
 
             {/* Audiomack link */}
-            {current?.audiomack_embed_url && s.audiomack_url && s.audiomack_url !== "#" && (
+            {s.audiomack_url && s.audiomack_url !== "#" && (
               <a
                 href={s.audiomack_url}
                 target="_blank"
