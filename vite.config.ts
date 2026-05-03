@@ -10,7 +10,13 @@ export default defineConfig({
     tsConfigPaths(),
     tailwindcss(),
     tanstackStart(),
-    nitro(),
+    nitro({
+      config: {
+        output: {
+          dir: "dist",
+        },
+      },
+    }),
     viteReact(),
   ],
 });
