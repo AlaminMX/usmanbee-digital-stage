@@ -5,16 +5,21 @@ import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 
+// Detect Vercel build environment. On Vercel, use the `vercel` preset
+// (Build Output API v3 → .vercel/output, no vercel.json needed).
+// Locally and elsewhere, build a standalone Node server into ./dist.
+const isVercel = !!process.env.VERCEL;
+
 export default defineConfig({
   plugins: [
     tsConfigPaths(),
     tailwindcss(),
     tanstackStart(),
-    nitro({
-      output: {
-        dir: "dist",
-      },
-    }),
+    nitro(
+      isVercel
+        ? { preset: "vercel" }
+        : { preset: "node-server", output: { dir: "dist" } },
+    ),
     viteReact(),
   ],
 });
