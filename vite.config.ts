@@ -11,10 +11,8 @@ export default defineConfig({
     tailwindcss(),
     tanstackStart(),
     nitro({
-      config: {
-        output: {
-          dir: "dist",
-        },
+      output: {
+        dir: "dist",
       },
     }),
     viteReact(),
