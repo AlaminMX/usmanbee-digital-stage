@@ -104,12 +104,7 @@ function AdminPage() {
       {/* Mobile drawer */}
       {drawerOpen && (
         <div className="fixed inset-0 z-50 md:hidden flex">
-          {/* Overlay */}
-          <div
-            className="absolute inset-0 bg-ink/70 backdrop-blur-sm"
-            onClick={() => setDrawerOpen(false)}
-          />
-          {/* Drawer panel */}
+          <div className="absolute inset-0 bg-ink/70 backdrop-blur-sm" onClick={() => setDrawerOpen(false)} />
           <div className="relative w-72 max-w-[85vw] bg-background border-r border-border p-6 flex flex-col h-full z-10">
             <button
               onClick={() => setDrawerOpen(false)}
@@ -168,10 +163,7 @@ function LoginGate({ onSuccess }: { onSuccess: () => void }) {
     setErr("");
     const ok = await adminLogin(u, p);
     setBusy(false);
-    if (!ok) {
-      setErr("Invalid credentials.");
-      return;
-    }
+    if (!ok) { setErr("Invalid credentials."); return; }
     onSuccess();
   };
 
@@ -184,7 +176,6 @@ function LoginGate({ onSuccess }: { onSuccess: () => void }) {
         <div className="text-[10px] font-mono uppercase tracking-[0.3em] text-gold-soft text-center mb-8">
           Admin Access
         </div>
-
         <label className="block text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground mb-2">Username</label>
         <input
           autoFocus
@@ -220,9 +211,10 @@ type Track = {
   subtitle: string | null;
   duration: string | null;
   plays: string | null;
-  spotify_embed_url: string | null;
-  audiomack_embed_url: string | null;
+  audio_url: string | null;
   cover_image_url: string | null;
+  spotify_url: string | null;
+  audiomack_url: string | null;
   display_order: number;
   is_active: boolean;
 };
@@ -296,7 +288,13 @@ function MusicTab() {
               <div className="font-semibold truncate text-sm md:text-base">{t.title}</div>
               <div className="text-xs text-muted-foreground truncate">{t.subtitle}</div>
             </div>
-            <div className="hidden lg:block text-xs font-mono text-muted-foreground shrink-0">{t.plays} · {t.duration}</div>
+            <div className="hidden lg:block text-xs font-mono text-muted-foreground shrink-0">
+              {t.audio_url ? (
+                <span className="text-green-400">✓ Audio</span>
+              ) : (
+                <span className="text-red-400">No audio</span>
+              )}
+            </div>
             <label className="flex items-center gap-1.5 text-xs shrink-0 cursor-pointer">
               <input type="checkbox" checked={t.is_active} onChange={() => toggleActive(t)} className="w-4 h-4" />
               <span className="hidden sm:inline">Active</span>
@@ -329,18 +327,32 @@ function TrackForm({
     subtitle: initial?.subtitle ?? "",
     duration: initial?.duration ?? "",
     plays: initial?.plays ?? "",
-    spotify_embed_url: initial?.spotify_embed_url ?? "",
-    audiomack_embed_url: initial?.audiomack_embed_url ?? "",
+    spotify_url: initial?.spotify_url ?? "",
+    audiomack_url: initial?.audiomack_url ?? "",
     cover_image_url: initial?.cover_image_url ?? "",
+    audio_url: initial?.audio_url ?? "",
   });
   const [busy, setBusy] = useState(false);
+  const [audioUploading, setAudioUploading] = useState(false);
 
-  const upload = async (file: File) => {
+  const uploadCover = async (file: File) => {
     const path = `${Date.now()}-${file.name}`;
     const { error } = await supabase.storage.from("track-covers").upload(path, file, { upsert: true });
     if (error) { toast.error(error.message); return; }
     const { data } = supabase.storage.from("track-covers").getPublicUrl(path);
     setF((prev) => ({ ...prev, cover_image_url: data.publicUrl }));
+    toast.success("Cover uploaded");
+  };
+
+  const uploadAudio = async (file: File) => {
+    setAudioUploading(true);
+    const path = `${Date.now()}-${file.name}`;
+    const { error } = await supabase.storage.from("track-audio").upload(path, file, { upsert: true });
+    setAudioUploading(false);
+    if (error) { toast.error(error.message); return; }
+    const { data } = supabase.storage.from("track-audio").getPublicUrl(path);
+    setF((prev) => ({ ...prev, audio_url: data.publicUrl }));
+    toast.success("Audio uploaded");
   };
 
   const save = async (e: FormEvent) => {
@@ -359,40 +371,66 @@ function TrackForm({
   return (
     <form onSubmit={save} className="mb-6 p-5 rounded-2xl border border-gold/30 bg-card grid grid-cols-1 md:grid-cols-2 gap-4">
       <FormField label="Title" value={f.title} onChange={(v) => setF({ ...f, title: v })} required />
-      <FormField label="Subtitle" value={f.subtitle ?? ""} onChange={(v) => setF({ ...f, subtitle: v })} />
-      <FormField label="Duration (3:12)" value={f.duration ?? ""} onChange={(v) => setF({ ...f, duration: v })} />
-      <FormField label="Plays (847K)" value={f.plays ?? ""} onChange={(v) => setF({ ...f, plays: v })} />
-      <div className="md:col-span-2">
-        <FormField
-          label="Spotify Embed URL (iframe src from Spotify share → embed)"
-          value={f.spotify_embed_url ?? ""}
-          onChange={(v) => setF({ ...f, spotify_embed_url: v })}
-        />
-      </div>
-      <div className="md:col-span-2">
-        <FormField
-          label="Audiomack Track Embed URL (iframe src from Audiomack share → embed)"
-          value={f.audiomack_embed_url ?? ""}
-          onChange={(v) => setF({ ...f, audiomack_embed_url: v })}
-        />
-      </div>
-      <div className="md:col-span-2">
-        <label className="block text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground mb-2">Cover Image</label>
-        <div className="flex items-center gap-4 flex-wrap">
-          {f.cover_image_url && <img src={f.cover_image_url} alt="" className="w-16 h-16 rounded-lg object-cover" />}
+      <FormField label="Subtitle (e.g. Single · 2025)" value={f.subtitle} onChange={(v) => setF({ ...f, subtitle: v })} />
+      <FormField label="Duration (e.g. 3:12)" value={f.duration} onChange={(v) => setF({ ...f, duration: v })} />
+      <FormField label="Plays count (e.g. 847K)" value={f.plays} onChange={(v) => setF({ ...f, plays: v })} />
+      <FormField label="Spotify Artist Page URL (optional)" value={f.spotify_url} onChange={(v) => setF({ ...f, spotify_url: v })} />
+      <FormField label="Audiomack URL (optional)" value={f.audiomack_url} onChange={(v) => setF({ ...f, audiomack_url: v })} />
+
+      {/* Cover image */}
+      <div>
+        <label className="block text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground mb-2">
+          Cover Image
+        </label>
+        <div className="space-y-2">
+          {f.cover_image_url && (
+            <img src={f.cover_image_url} alt="" className="w-16 h-16 rounded-lg object-cover" />
+          )}
           <input
             type="file"
             accept="image/*"
-            onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])}
-            className="text-sm"
+            onChange={(e) => e.target.files?.[0] && uploadCover(e.target.files[0])}
+            className="text-sm w-full"
           />
         </div>
       </div>
+
+      {/* Audio file */}
+      <div>
+        <label className="block text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground mb-2">
+          Audio File (MP3 or M4A)
+        </label>
+        <div className="space-y-2">
+          {f.audio_url && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-green-400">✓ Audio uploaded</span>
+              <audio controls src={f.audio_url} className="h-8 max-w-[180px]" />
+            </div>
+          )}
+          <input
+            type="file"
+            accept="audio/mp3,audio/mpeg,audio/m4a,audio/mp4,audio/*"
+            onChange={(e) => e.target.files?.[0] && uploadAudio(e.target.files[0])}
+            className="text-sm w-full"
+            disabled={audioUploading}
+          />
+          {audioUploading && (
+            <p className="text-xs text-gold animate-pulse">Uploading audio… please wait</p>
+          )}
+        </div>
+      </div>
+
       <div className="md:col-span-2 flex gap-3 flex-wrap">
-        <button type="submit" disabled={busy} className="px-5 py-2.5 rounded-xl bg-gradient-gold text-ink font-semibold disabled:opacity-60">
+        <button
+          type="submit"
+          disabled={busy || audioUploading}
+          className="px-5 py-2.5 rounded-xl bg-gradient-gold text-ink font-semibold disabled:opacity-60"
+        >
           {initial ? "Update" : "Save"}
         </button>
-        <button type="button" onClick={onClose} className="px-5 py-2.5 rounded-xl border border-border">Cancel</button>
+        <button type="button" onClick={onClose} className="px-5 py-2.5 rounded-xl border border-border">
+          Cancel
+        </button>
       </div>
     </form>
   );
@@ -593,11 +631,9 @@ function BookingsTab({ onChanged }: { onChanged: () => void }) {
           return (
             <div key={b.id} className={`p-4 rounded-xl border ${color}`}>
               <div className="flex items-start md:items-center gap-3 flex-wrap">
-                <span
-                  className={`text-[10px] font-mono uppercase tracking-[0.2em] px-2 py-1 rounded shrink-0 ${
-                    b.status === "unread" ? "bg-gradient-gold text-ink" : "bg-background text-muted-foreground"
-                  }`}
-                >
+                <span className={`text-[10px] font-mono uppercase tracking-[0.2em] px-2 py-1 rounded shrink-0 ${
+                  b.status === "unread" ? "bg-gradient-gold text-ink" : "bg-background text-muted-foreground"
+                }`}>
                   {b.status}
                 </span>
                 <div className="flex-1 min-w-0">
@@ -653,10 +689,7 @@ function SettingsTab() {
     const rows = keys.map((k) => ({ key: k, value: s[k] ?? "" }));
     const { error } = await supabase.from("site_settings").upsert(rows, { onConflict: "key" });
     if (error) toast.error(error.message);
-    else {
-      toast.success("Saved");
-      refreshSiteSettings();
-    }
+    else { toast.success("Saved"); refreshSiteSettings(); }
   };
 
   const uploadHero = async (file: File) => {
@@ -695,6 +728,21 @@ function SettingsTab() {
           <FormField label="Stat 3 Label" value={s.hero_stat3_label ?? ""} onChange={(v) => set("hero_stat3_label", v)} />
           <FormField label="Stat 3 Value" value={s.hero_stat3_value ?? ""} onChange={(v) => set("hero_stat3_value", v)} />
         </div>
+      </Section>
+
+      <Section title="Music Player" onSave={() => saveSection(["autoplay_enabled"])}>
+        <label className="flex items-center gap-3 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            checked={s.autoplay_enabled === "true"}
+            onChange={(e) => set("autoplay_enabled", e.target.checked ? "true" : "false")}
+            className="w-4 h-4"
+          />
+          Auto-play top track when page loads
+        </label>
+        <p className="text-xs text-muted-foreground">
+          When enabled, the first track starts playing automatically when a visitor opens the site. Browsers may block this on first visit — the user will need to interact with the page first.
+        </p>
       </Section>
 
       <Section title="Countdown" onSave={() => saveSection(["countdown_active", "countdown_target_date", "countdown_release_title"])}>
@@ -747,8 +795,6 @@ function Section({ title, children, onSave }: { title: string; children: React.R
     </div>
   );
 }
-
-/* ────────────────── Shared Field ────────────────── */
 
 function FormField({
   label, value, onChange, required, multiline, rows, type = "text",
