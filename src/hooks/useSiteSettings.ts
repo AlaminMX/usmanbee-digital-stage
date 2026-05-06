@@ -24,6 +24,7 @@ const DEFAULTS: SiteSettings = {
   youtube_channel_url: "",
   twitter_url: "",
   artist_bio: "",
+  autoplay_enabled: "false",
 };
 
 let cache: SiteSettings | null = null;
