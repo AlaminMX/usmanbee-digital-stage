@@ -1,16 +1,20 @@
 import { useEffect, useState } from "react";
-
-const links = [
-  { href: "#music", label: "Music" },
-  { href: "#drop", label: "Next Drop" },
-  { href: "#videos", label: "Visuals" },
-  { href: "#story", label: "Story" },
-  { href: "#contact", label: "Bookings" },
-];
+import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export function Nav() {
+  const s = useSiteSettings();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+
+  const showCountdown = s.countdown_active === "true";
+
+  const links = [
+    { href: "#music", label: "Music" },
+    ...(showCountdown ? [{ href: "#drop", label: "Next Drop" }] : []),
+    { href: "#videos", label: "Visuals" },
+    { href: "#story", label: "Story" },
+    { href: "#contact", label: "Bookings" },
+  ];
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
