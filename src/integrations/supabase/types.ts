@@ -100,7 +100,9 @@ export type Database = {
       }
       tracks: {
         Row: {
+          audio_url: string | null
           audiomack_embed_url: string | null
+          audiomack_url: string | null
           cover_image_url: string | null
           created_at: string
           display_order: number
@@ -109,11 +111,14 @@ export type Database = {
           is_active: boolean
           plays: string | null
           spotify_embed_url: string | null
+          spotify_url: string | null
           subtitle: string | null
           title: string
         }
         Insert: {
+          audio_url?: string | null
           audiomack_embed_url?: string | null
+          audiomack_url?: string | null
           cover_image_url?: string | null
           created_at?: string
           display_order?: number
@@ -122,11 +127,14 @@ export type Database = {
           is_active?: boolean
           plays?: string | null
           spotify_embed_url?: string | null
+          spotify_url?: string | null
           subtitle?: string | null
           title: string
         }
         Update: {
+          audio_url?: string | null
           audiomack_embed_url?: string | null
+          audiomack_url?: string | null
           cover_image_url?: string | null
           created_at?: string
           display_order?: number
@@ -135,6 +143,7 @@ export type Database = {
           is_active?: boolean
           plays?: string | null
           spotify_embed_url?: string | null
+          spotify_url?: string | null
           subtitle?: string | null
           title?: string
         }
