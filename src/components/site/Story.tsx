@@ -44,7 +44,7 @@ export function Story() {
             </div>
             <h2 className="font-display font-black text-[clamp(2.5rem,6vw,4.5rem)] leading-[0.95] tracking-tighter mb-8">
               Born in the North. <br />
-              <span className="text-gradient-gold italic">Forged in Lagos.</span>
+              <span className="text-gradient-gold italic">Forged for Greatness.</span>
             </h2>
 
             <div className="space-y-5 text-base md:text-lg text-muted-foreground leading-relaxed">
