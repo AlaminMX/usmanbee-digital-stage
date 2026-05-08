@@ -22,10 +22,10 @@ export function Music() {
   const [progress, setProgress] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
-  const [volume, setVolume] = useState(0.8);
-  const [muted, setMuted] = useState(false);
+  const [loading, setLoading] = useState(true);
   const audioRef = useRef<HTMLAudioElement>(null);
   const autoplayAttempted = useRef(false);
+  const settingsLoaded = useRef(false);
 
   useEffect(() => {
     supabase
@@ -35,6 +35,7 @@ export function Music() {
       .order("display_order", { ascending: true })
       .limit(4)
       .then(({ data }) => {
+        setLoading(false);
         if (data && data.length) {
           setTracks(data as Track[]);
           setActiveId(data[0].id);
@@ -42,7 +43,7 @@ export function Music() {
       });
   }, []);
 
-  // When active track changes, load new src and play if already playing
+  // Load new audio src when active track changes
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !activeId) return;
@@ -50,35 +51,41 @@ export function Music() {
     if (!track?.audio_url) return;
     const wasPlaying = isPlaying;
     audio.src = track.audio_url;
+    audio.muted = false; // always ensure unmuted when switching tracks
     audio.load();
     if (wasPlaying) {
       audio.play().catch(() => setIsPlaying(false));
     }
   }, [activeId, tracks]);
 
-  // Autoplay on first load when settings say so
+  // Autoplay — runs once when both tracks and settings are ready
   useEffect(() => {
     if (autoplayAttempted.current) return;
     if (!activeId || !tracks.length) return;
+    // Wait until settings are actually loaded from Supabase (not just defaults)
     if (s.autoplay_enabled !== "true") return;
     const audio = audioRef.current;
     if (!audio) return;
+    const track = tracks.find((t) => t.id === activeId);
+    if (!track?.audio_url) return;
+
     autoplayAttempted.current = true;
-    // Browsers block autoplay with sound — start muted then unmute
-    audio.muted = true;
+
+    if (!audio.src) {
+      audio.src = track.audio_url;
+      audio.load();
+    }
+
+    // Do NOT start muted — instead just try to play directly.
+    // Modern browsers allow autoplay if user has interacted with the domain before.
+    // Starting muted then unmuting causes the "no sound" bug.
+    audio.muted = false;
+    audio.volume = 1;
+
     audio.play()
-      .then(() => {
-        setIsPlaying(true);
-        // Unmute after a short delay so browser allows it
-        setTimeout(() => {
-          if (audioRef.current) {
-            audioRef.current.muted = false;
-            setMuted(false);
-          }
-        }, 500);
-      })
+      .then(() => setIsPlaying(true))
       .catch(() => {
-        // Browser blocked autoplay entirely — that's fine, user clicks play
+        // Browser blocked — silently fail, user clicks play
         setIsPlaying(false);
       });
   }, [activeId, tracks, s.autoplay_enabled]);
@@ -89,10 +96,16 @@ export function Music() {
     const current = tracks.find((t) => t.id === activeId);
     if (!current?.audio_url) return;
 
-    if (!audio.src || audio.src !== current.audio_url) {
+    if (!audio.src || !audio.src.includes(current.audio_url.split("/").pop()!)) {
       audio.src = current.audio_url;
+      audio.muted = false;
+      audio.volume = 1;
       audio.load();
     }
+
+    // Fix: always ensure unmuted before playing
+    audio.muted = false;
+    audio.volume = audio.volume === 0 ? 1 : audio.volume;
 
     if (isPlaying) {
       audio.pause();
@@ -113,8 +126,6 @@ export function Music() {
       return;
     }
     setActiveId(id);
-    // useEffect above handles loading + playing
-    if (!isPlaying) setIsPlaying(false);
   };
 
   const handleTimeUpdate = () => {
@@ -131,7 +142,6 @@ export function Music() {
   };
 
   const handleEnded = () => {
-    // Auto-advance to next track
     const idx = tracks.findIndex((t) => t.id === activeId);
     if (idx < tracks.length - 1) {
       setActiveId(tracks[idx + 1].id);
@@ -147,30 +157,15 @@ export function Music() {
     const audio = audioRef.current;
     if (!audio || !audio.duration) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const pct = x / rect.width;
+    const pct = (e.clientX - rect.left) / rect.width;
     audio.currentTime = pct * audio.duration;
-  };
-
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = parseFloat(e.target.value);
-    setVolume(v);
-    if (audioRef.current) audioRef.current.volume = v;
-    if (v > 0) setMuted(false);
-  };
-
-  const toggleMute = () => {
-    if (!audioRef.current) return;
-    const next = !muted;
-    setMuted(next);
-    audioRef.current.muted = next;
   };
 
   const fmt = (secs: number) => {
     if (!secs || isNaN(secs)) return "0:00";
     const m = Math.floor(secs / 60);
-    const s = Math.floor(secs % 60);
-    return `${m}:${s.toString().padStart(2, "0")}`;
+    const sec = Math.floor(secs % 60);
+    return `${m}:${sec.toString().padStart(2, "0")}`;
   };
 
   const current = tracks.find((t) => t.id === activeId) ?? null;
@@ -184,7 +179,6 @@ export function Music() {
 
   return (
     <section id="music" className="relative py-24 md:py-36">
-      {/* Hidden audio element */}
       <audio
         ref={audioRef}
         onTimeUpdate={handleTimeUpdate}
@@ -216,7 +210,6 @@ export function Music() {
           <div className="lg:col-span-2 relative group">
             <div className="absolute -inset-4 bg-gradient-gold opacity-20 blur-2xl group-hover:opacity-40 transition-opacity" />
 
-            {/* Cover art */}
             <div className="relative aspect-square rounded-2xl overflow-hidden border border-border">
               {current?.cover_image_url ? (
                 <img
@@ -232,7 +225,6 @@ export function Music() {
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-ink/90 via-transparent to-transparent" />
 
-              {/* Play / Pause button */}
               <button
                 onClick={handlePlayPause}
                 disabled={!current?.audio_url}
@@ -244,7 +236,6 @@ export function Music() {
                 </span>
               </button>
 
-              {/* Track info */}
               <div className="absolute bottom-0 left-0 right-0 p-6 pointer-events-none">
                 <div className="text-xs font-mono uppercase tracking-[0.25em] text-gold-soft mb-2">
                   {isPlaying ? "Now Playing" : "Up Next"}
@@ -254,15 +245,14 @@ export function Music() {
               </div>
             </div>
 
-            {/* Player controls */}
+            {/* Progress bar only — no volume control */}
             <div className="mt-4 p-4 rounded-2xl border border-border bg-card/60 space-y-3">
-              {/* Progress bar */}
               <div
                 className="relative h-1.5 bg-border rounded-full cursor-pointer group/seek"
                 onClick={handleSeek}
               >
                 <div
-                  className="absolute left-0 top-0 h-full bg-gradient-gold rounded-full transition-all"
+                  className="absolute left-0 top-0 h-full bg-gradient-gold rounded-full"
                   style={{ width: `${progress}%` }}
                 />
                 <div
@@ -270,31 +260,12 @@ export function Music() {
                   style={{ left: `calc(${progress}% - 6px)` }}
                 />
               </div>
-
-              {/* Time */}
               <div className="flex justify-between text-[10px] font-mono text-muted-foreground">
                 <span>{fmt(currentTime)}</span>
                 <span>{fmt(audioDuration)}</span>
               </div>
-
-              {/* Volume */}
-              <div className="flex items-center gap-3">
-                <button onClick={toggleMute} className="text-muted-foreground hover:text-gold transition-colors shrink-0">
-                  {muted || volume === 0 ? <MuteIcon /> : <VolumeIcon />}
-                </button>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={muted ? 0 : volume}
-                  onChange={handleVolumeChange}
-                  className="flex-1 h-1 accent-amber-400 cursor-pointer"
-                />
-              </div>
             </div>
 
-            {/* Streaming platforms */}
             {platforms.length > 0 && (
               <div className="mt-4 grid grid-cols-2 gap-3">
                 {platforms.map((p) => (
@@ -330,65 +301,74 @@ export function Music() {
               <span className="w-12 text-right">Time</span>
             </div>
 
-            {tracks.map((t, i) => {
-              const isActive = t.id === activeId;
-              return (
-                <button
-                  key={t.id}
-                  onClick={() => handleTrackClick(t.id)}
-                  className={`w-full flex items-center gap-4 px-4 py-4 rounded-xl text-left transition-all group/row ${
-                    isActive
-                      ? "bg-card border border-gold/30 shadow-gold-sm"
-                      : "hover:bg-card border border-transparent"
-                  }`}
-                >
-                  <div className="w-8 text-sm font-mono shrink-0">
-                    {isActive && isPlaying ? (
-                      <span className="flex gap-0.5 items-end h-4">
-                        <span className="w-0.5 bg-gold animate-pulse" style={{ height: "60%" }} />
-                        <span className="w-0.5 bg-gold animate-pulse" style={{ height: "100%", animationDelay: "0.2s" }} />
-                        <span className="w-0.5 bg-gold animate-pulse" style={{ height: "40%", animationDelay: "0.4s" }} />
-                      </span>
-                    ) : isActive ? (
-                      <span className="flex gap-0.5 items-end h-4">
-                        <span className="w-0.5 bg-gold/50" style={{ height: "60%" }} />
-                        <span className="w-0.5 bg-gold/50" style={{ height: "100%" }} />
-                        <span className="w-0.5 bg-gold/50" style={{ height: "40%" }} />
-                      </span>
-                    ) : (
-                      <>
-                        <span className="text-muted-foreground group-hover/row:hidden">
-                          {String(i + 1).padStart(2, "0")}
-                        </span>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="hidden group-hover/row:block text-gold">
-                          <path d="M8 5v14l11-7z" />
-                        </svg>
-                      </>
-                    )}
-                  </div>
-                  <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-card">
-                    {t.cover_image_url ? (
-                      <img src={t.cover_image_url} alt="" className="w-full h-full object-cover" loading="lazy" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <MusicNoteIcon small />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className={`font-semibold truncate ${isActive ? "text-gold" : ""}`}>{t.title}</div>
-                    <div className="text-xs text-muted-foreground truncate">{t.subtitle}</div>
-                  </div>
-                  <div className="hidden sm:block w-20 text-right text-sm font-mono text-muted-foreground">{t.plays}</div>
-                  <div className="w-12 text-right text-sm font-mono text-muted-foreground">{t.duration}</div>
-                </button>
-              );
-            })}
-
-            {!tracks.length && (
-              <div className="px-4 py-8 text-sm text-muted-foreground text-center">
-                Tracks will appear here once added from the admin panel.
+            {loading ? (
+              <div className="px-4 py-8 flex items-center justify-center gap-3 text-sm text-muted-foreground">
+                <span className="flex gap-0.5 items-end h-4">
+                  <span className="w-0.5 bg-gold/40 animate-pulse" style={{ height: "60%" }} />
+                  <span className="w-0.5 bg-gold/40 animate-pulse" style={{ height: "100%", animationDelay: "0.2s" }} />
+                  <span className="w-0.5 bg-gold/40 animate-pulse" style={{ height: "40%", animationDelay: "0.4s" }} />
+                </span>
+                Loading tracks…
               </div>
+            ) : tracks.length === 0 ? (
+              <div className="px-4 py-8 text-sm text-muted-foreground text-center">
+                No tracks available right now.
+              </div>
+            ) : (
+              tracks.map((t, i) => {
+                const isActive = t.id === activeId;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => handleTrackClick(t.id)}
+                    className={`w-full flex items-center gap-4 px-4 py-4 rounded-xl text-left transition-all group/row ${
+                      isActive
+                        ? "bg-card border border-gold/30 shadow-gold-sm"
+                        : "hover:bg-card border border-transparent"
+                    }`}
+                  >
+                    <div className="w-8 text-sm font-mono shrink-0">
+                      {isActive && isPlaying ? (
+                        <span className="flex gap-0.5 items-end h-4">
+                          <span className="w-0.5 bg-gold animate-pulse" style={{ height: "60%" }} />
+                          <span className="w-0.5 bg-gold animate-pulse" style={{ height: "100%", animationDelay: "0.2s" }} />
+                          <span className="w-0.5 bg-gold animate-pulse" style={{ height: "40%", animationDelay: "0.4s" }} />
+                        </span>
+                      ) : isActive ? (
+                        <span className="flex gap-0.5 items-end h-4">
+                          <span className="w-0.5 bg-gold/50" style={{ height: "60%" }} />
+                          <span className="w-0.5 bg-gold/50" style={{ height: "100%" }} />
+                          <span className="w-0.5 bg-gold/50" style={{ height: "40%" }} />
+                        </span>
+                      ) : (
+                        <>
+                          <span className="text-muted-foreground group-hover/row:hidden">
+                            {String(i + 1).padStart(2, "0")}
+                          </span>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="hidden group-hover/row:block text-gold">
+                            <path d="M8 5v14l11-7z" />
+                          </svg>
+                        </>
+                      )}
+                    </div>
+                    <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0 bg-card">
+                      {t.cover_image_url ? (
+                        <img src={t.cover_image_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <MusicNoteIcon small />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className={`font-semibold truncate ${isActive ? "text-gold" : ""}`}>{t.title}</div>
+                      <div className="text-xs text-muted-foreground truncate">{t.subtitle}</div>
+                    </div>
+                    <div className="hidden sm:block w-20 text-right text-sm font-mono text-muted-foreground">{t.plays}</div>
+                    <div className="w-12 text-right text-sm font-mono text-muted-foreground">{t.duration}</div>
+                  </button>
+                );
+              })
             )}
           </div>
         </div>
@@ -408,23 +388,6 @@ function PauseIcon() {
   return (
     <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" className="text-ink">
       <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
-    </svg>
-  );
-}
-function VolumeIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-      <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" strokeLinecap="round" />
-    </svg>
-  );
-}
-function MuteIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-      <line x1="23" y1="9" x2="17" y2="15" strokeLinecap="round" />
-      <line x1="17" y1="9" x2="23" y2="15" strokeLinecap="round" />
     </svg>
   );
 }
