@@ -542,15 +542,30 @@ function VideoForm({
     title: initial?.title ?? "",
     tag: initial?.tag ?? "",
     youtube_video_id: initial?.youtube_video_id ?? "",
+    thumbnail_url: initial?.thumbnail_url ?? "",
   });
   const [busy, setBusy] = useState(false);
+  const [thumbUploading, setThumbUploading] = useState(false);
+
+  const uploadThumb = async (file: File) => {
+    setThumbUploading(true);
+    const path = `video-thumb-${Date.now()}-${file.name}`;
+    const { error } = await supabase.storage.from("site-images").upload(path, file, { upsert: true });
+    setThumbUploading(false);
+    if (error) { toast.error(error.message); return; }
+    const { data } = supabase.storage.from("site-images").getPublicUrl(path);
+    setF((prev) => ({ ...prev, thumbnail_url: data.publicUrl }));
+    toast.success("Thumbnail uploaded");
+  };
 
   const save = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
+    // Use custom thumbnail if uploaded, otherwise fall back to YouTube auto-thumbnail
     const payload = {
       ...f,
-      thumbnail_url: `https://img.youtube.com/vi/${f.youtube_video_id}/maxresdefault.jpg`,
+      thumbnail_url: f.thumbnail_url ||
+        `https://img.youtube.com/vi/${f.youtube_video_id}/maxresdefault.jpg`,
     };
     if (initial) {
       await supabase.from("videos").update(payload).eq("id", initial.id);
@@ -561,6 +576,11 @@ function VideoForm({
     toast.success("Saved");
     onSaved();
   };
+
+  const ytThumb = f.youtube_video_id
+    ? `https://img.youtube.com/vi/${f.youtube_video_id}/mqdefault.jpg`
+    : null;
+  const previewThumb = f.thumbnail_url || ytThumb;
 
   return (
     <form onSubmit={save} className="mb-6 p-5 rounded-2xl border border-gold/30 bg-card grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -574,8 +594,46 @@ function VideoForm({
           required
         />
       </div>
+
+      {/* Custom thumbnail upload */}
+      <div className="md:col-span-2">
+        <label className="block text-[10px] font-mono uppercase tracking-[0.25em] text-muted-foreground mb-2">
+          Custom Thumbnail (optional — uses YouTube thumbnail if not set)
+        </label>
+        <div className="flex items-start gap-4 flex-wrap">
+          {previewThumb && (
+            <img
+              src={previewThumb}
+              alt="Thumbnail preview"
+              className="w-32 aspect-video rounded-lg object-cover bg-card border border-border"
+            />
+          )}
+          <div className="space-y-2 flex-1 min-w-[200px]">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => e.target.files?.[0] && uploadThumb(e.target.files[0])}
+              className="text-sm w-full"
+              disabled={thumbUploading}
+            />
+            {thumbUploading && (
+              <p className="text-xs text-gold animate-pulse">Uploading thumbnail…</p>
+            )}
+            {f.thumbnail_url && (
+              <button
+                type="button"
+                onClick={() => setF((p) => ({ ...p, thumbnail_url: "" }))}
+                className="text-xs text-red-400 hover:underline"
+              >
+                Remove custom thumbnail (use YouTube default)
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
       <div className="md:col-span-2 flex gap-3 flex-wrap">
-        <button type="submit" disabled={busy} className="px-5 py-2.5 rounded-xl bg-gradient-gold text-ink font-semibold disabled:opacity-60">
+        <button type="submit" disabled={busy || thumbUploading} className="px-5 py-2.5 rounded-xl bg-gradient-gold text-ink font-semibold disabled:opacity-60">
           {initial ? "Update" : "Save"}
         </button>
         <button type="button" onClick={onClose} className="px-5 py-2.5 rounded-xl border border-border">Cancel</button>
