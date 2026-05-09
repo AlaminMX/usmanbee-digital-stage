@@ -2,16 +2,18 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 
 export function Footer() {
   const s = useSiteSettings();
+
   const socials = [
     { name: "Instagram", href: s.instagram_url },
     { name: "X / Twitter", href: s.twitter_url },
     { name: "YouTube", href: s.youtube_channel_url },
-  ];
+  ].filter((it) => it.href && it.href !== "#");
+
   const streaming = [
     { name: "Audiomack", href: s.audiomack_url },
     { name: "Spotify", href: s.spotify_url },
-    { name: "Apple Music", href: "#" },
-  ];
+    { name: "Apple Music", href: s.apple_music_url },
+  ].filter((it) => it.href && it.href !== "#");
 
   return (
     <footer className="relative border-t border-border bg-ink/50 pt-16 pb-8">
@@ -26,8 +28,8 @@ export function Footer() {
             </p>
           </div>
 
-          <FooterCol title="Streaming" items={streaming} />
-          <FooterCol title="Social" items={socials} />
+          {streaming.length > 0 && <FooterCol title="Streaming" items={streaming} />}
+          {socials.length > 0 && <FooterCol title="Social" items={socials} />}
         </div>
 
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 pt-8 border-t border-border text-xs font-mono text-muted-foreground">
@@ -50,7 +52,7 @@ function FooterCol({ title, items }: { title: string; items: { name: string; hre
         {items.map((it) => (
           <li key={it.name}>
             <a
-              href={it.href || "#"}
+              href={it.href}
               target="_blank"
               rel="noopener noreferrer"
               className="text-sm text-muted-foreground hover:text-gold transition-colors inline-flex items-center gap-2 group"
