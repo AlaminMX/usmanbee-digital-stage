@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useSiteSettings } from "@/hooks/useSiteSettings";
+import { useSiteSettings, useSettingsLoaded } from "@/hooks/useSiteSettings";
 
 type Track = {
   id: string;
@@ -16,6 +16,7 @@ type Track = {
 
 export function Music() {
   const s = useSiteSettings();
+  const settingsLoaded = useSettingsLoaded();
   const [tracks, setTracks] = useState<Track[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -25,7 +26,6 @@ export function Music() {
   const [loading, setLoading] = useState(true);
   const audioRef = useRef<HTMLAudioElement>(null);
   const autoplayAttempted = useRef(false);
-  const settingsLoaded = useRef(false);
 
   useEffect(() => {
     supabase
@@ -51,19 +51,21 @@ export function Music() {
     if (!track?.audio_url) return;
     const wasPlaying = isPlaying;
     audio.src = track.audio_url;
-    audio.muted = false; // always ensure unmuted when switching tracks
+    audio.muted = false;
+    audio.volume = 1;
     audio.load();
     if (wasPlaying) {
       audio.play().catch(() => setIsPlaying(false));
     }
   }, [activeId, tracks]);
 
-  // Autoplay — runs once when both tracks and settings are ready
+  // Autoplay — only fires after REAL settings are loaded from Supabase
   useEffect(() => {
     if (autoplayAttempted.current) return;
+    if (!settingsLoaded) return; // wait for real Supabase data, not defaults
     if (!activeId || !tracks.length) return;
-    // Wait until settings are actually loaded from Supabase (not just defaults)
     if (s.autoplay_enabled !== "true") return;
+
     const audio = audioRef.current;
     if (!audio) return;
     const track = tracks.find((t) => t.id === activeId);
@@ -76,19 +78,13 @@ export function Music() {
       audio.load();
     }
 
-    // Do NOT start muted — instead just try to play directly.
-    // Modern browsers allow autoplay if user has interacted with the domain before.
-    // Starting muted then unmuting causes the "no sound" bug.
     audio.muted = false;
     audio.volume = 1;
 
     audio.play()
       .then(() => setIsPlaying(true))
-      .catch(() => {
-        // Browser blocked — silently fail, user clicks play
-        setIsPlaying(false);
-      });
-  }, [activeId, tracks, s.autoplay_enabled]);
+      .catch(() => setIsPlaying(false));
+  }, [activeId, tracks, s.autoplay_enabled, settingsLoaded]);
 
   const handlePlayPause = async () => {
     const audio = audioRef.current;
@@ -96,16 +92,15 @@ export function Music() {
     const current = tracks.find((t) => t.id === activeId);
     if (!current?.audio_url) return;
 
-    if (!audio.src || !audio.src.includes(current.audio_url.split("/").pop()!)) {
+    if (!audio.src) {
       audio.src = current.audio_url;
       audio.muted = false;
       audio.volume = 1;
       audio.load();
     }
 
-    // Fix: always ensure unmuted before playing
     audio.muted = false;
-    audio.volume = audio.volume === 0 ? 1 : audio.volume;
+    if (audio.volume === 0) audio.volume = 1;
 
     if (isPlaying) {
       audio.pause();
@@ -245,7 +240,7 @@ export function Music() {
               </div>
             </div>
 
-            {/* Progress bar only — no volume control */}
+            {/* Progress bar — no volume control */}
             <div className="mt-4 p-4 rounded-2xl border border-border bg-card/60 space-y-3">
               <div
                 className="relative h-1.5 bg-border rounded-full cursor-pointer group/seek"
