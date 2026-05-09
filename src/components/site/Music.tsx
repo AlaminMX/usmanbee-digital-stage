@@ -24,6 +24,8 @@ export function Music() {
   const [currentTime, setCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
   const [loading, setLoading] = useState(true);
+  // showUnmutePrompt = true when autoplay is on but browser blocked it
+  const [showUnmutePrompt, setShowUnmutePrompt] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const autoplayAttempted = useRef(false);
 
@@ -43,7 +45,7 @@ export function Music() {
       });
   }, []);
 
-  // Load new audio src when active track changes
+  // Load audio src when active track changes
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || !activeId) return;
@@ -59,10 +61,10 @@ export function Music() {
     }
   }, [activeId, tracks]);
 
-  // Autoplay — only fires after REAL settings are loaded from Supabase
+  // Autoplay — waits for real settings from Supabase
   useEffect(() => {
     if (autoplayAttempted.current) return;
-    if (!settingsLoaded) return; // wait for real Supabase data, not defaults
+    if (!settingsLoaded) return;
     if (!activeId || !tracks.length) return;
     if (s.autoplay_enabled !== "true") return;
 
@@ -81,10 +83,35 @@ export function Music() {
     audio.muted = false;
     audio.volume = 1;
 
+    // Strategy: try unmuted play first.
+    // If browser blocks it, fall back to muted play (which browsers allow),
+    // then show a "tap to unmute" prompt instead of silently failing.
     audio.play()
-      .then(() => setIsPlaying(true))
-      .catch(() => setIsPlaying(false));
+      .then(() => {
+        setIsPlaying(true);
+        setShowUnmutePrompt(false);
+      })
+      .catch(() => {
+        // Unmuted play blocked — try muted (always succeeds)
+        audio.muted = true;
+        audio.play()
+          .then(() => {
+            setIsPlaying(true);
+            setShowUnmutePrompt(true); // show unmute button
+          })
+          .catch(() => {
+            setIsPlaying(false);
+          });
+      });
   }, [activeId, tracks, s.autoplay_enabled, settingsLoaded]);
+
+  const handleUnmute = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.muted = false;
+    audio.volume = 1;
+    setShowUnmutePrompt(false);
+  };
 
   const handlePlayPause = async () => {
     const audio = audioRef.current;
@@ -101,6 +128,7 @@ export function Music() {
 
     audio.muted = false;
     if (audio.volume === 0) audio.volume = 1;
+    setShowUnmutePrompt(false);
 
     if (isPlaying) {
       audio.pause();
@@ -184,6 +212,24 @@ export function Music() {
         preload="metadata"
       />
 
+      {/* Unmute prompt — fixed bottom bar when playing muted */}
+      {showUnmutePrompt && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 px-6 py-3 rounded-full bg-card border border-gold/50 shadow-gold backdrop-blur animate-in slide-in-from-bottom-4">
+          <span className="flex gap-0.5 items-end h-4 shrink-0">
+            <span className="w-0.5 bg-gold animate-pulse" style={{ height: "60%" }} />
+            <span className="w-0.5 bg-gold animate-pulse" style={{ height: "100%", animationDelay: "0.2s" }} />
+            <span className="w-0.5 bg-gold animate-pulse" style={{ height: "40%", animationDelay: "0.4s" }} />
+          </span>
+          <span className="text-sm font-medium text-foreground whitespace-nowrap">Music is playing</span>
+          <button
+            onClick={handleUnmute}
+            className="px-4 py-1.5 rounded-full bg-gradient-gold text-ink text-xs font-bold whitespace-nowrap"
+          >
+            Tap to unmute
+          </button>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-5 md:px-10">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-14">
           <div>
@@ -240,7 +286,7 @@ export function Music() {
               </div>
             </div>
 
-            {/* Progress bar — no volume control */}
+            {/* Progress bar */}
             <div className="mt-4 p-4 rounded-2xl border border-border bg-card/60 space-y-3">
               <div
                 className="relative h-1.5 bg-border rounded-full cursor-pointer group/seek"
@@ -251,7 +297,7 @@ export function Music() {
                   style={{ width: `${progress}%` }}
                 />
                 <div
-                  className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-gold shadow-gold opacity-0 group-hover/seek:opacity-100 transition-opacity"
+                  className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-gold opacity-0 group-hover/seek:opacity-100 transition-opacity"
                   style={{ left: `calc(${progress}% - 6px)` }}
                 />
               </div>
