@@ -54,12 +54,6 @@ export function Story() {
                 <p>{s.artist_bio}</p>
               )}
             </div>
-
-            <div className="mt-10 grid grid-cols-3 gap-6 border-t border-border pt-8">
-              <Pillar label="Origin" value="Kano → Lagos" />
-              <Pillar label="Sound" value="Afro-Rap Fusion" />
-              <Pillar label="Status" value="Independent" />
-            </div>
           </div>
         </div>
       </div>
