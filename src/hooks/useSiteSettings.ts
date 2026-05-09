@@ -28,14 +28,18 @@ const DEFAULTS: SiteSettings = {
 };
 
 let cache: SiteSettings | null = null;
+let loaded = false; // true only after first real Supabase fetch completes
 const subs = new Set<(s: SiteSettings) => void>();
+const loadedSubs = new Set<(v: boolean) => void>();
 
 async function load() {
   const { data } = await supabase.from("site_settings").select("key,value");
   const next: SiteSettings = { ...DEFAULTS };
   if (data) for (const row of data) next[row.key] = row.value ?? "";
   cache = next;
+  loaded = true;
   subs.forEach((fn) => fn(next));
+  loadedSubs.forEach((fn) => fn(true));
   return next;
 }
 
@@ -45,11 +49,22 @@ export function useSiteSettings() {
     subs.add(setSettings);
     if (!cache) load();
     else setSettings(cache);
-    return () => {
-      subs.delete(setSettings);
-    };
+    return () => { subs.delete(setSettings); };
   }, []);
   return settings;
+}
+
+// Returns true only after settings have been fetched from Supabase
+// Use this to gate autoplay so it doesn't fire on stale defaults
+export function useSettingsLoaded() {
+  const [isLoaded, setIsLoaded] = useState(loaded);
+  useEffect(() => {
+    if (loaded) { setIsLoaded(true); return; }
+    loadedSubs.add(setIsLoaded);
+    if (!cache) load();
+    return () => { loadedSubs.delete(setIsLoaded); };
+  }, []);
+  return isLoaded;
 }
 
 export function refreshSiteSettings() {
